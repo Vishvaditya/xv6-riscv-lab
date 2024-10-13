@@ -91,3 +91,11 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+
+// sys_info implementation of system call function
+uint64
+sys_info(void)
+{
+  return -1;
+}
