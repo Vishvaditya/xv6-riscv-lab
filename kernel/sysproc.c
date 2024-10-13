@@ -97,5 +97,14 @@ sys_uptime(void)
 uint64
 sys_info(void)
 {
-  return -1;
+  int param;
+  argint(0, &param);
+  if(param<=0)
+  {
+    printf("Wrong Parameter\n");
+    return -1;
+  }
+  printf("System Call running!\n");
+  return 0;  
+
 }
