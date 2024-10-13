@@ -5,7 +5,7 @@
 #include "user.h"
 
 int main(){
-    printf('Testing custom system call\n');
+    printf("Testing custom system call\n");
     info(0);
     info(1);
     exit(0);
