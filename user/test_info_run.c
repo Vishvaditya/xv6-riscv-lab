@@ -7,6 +7,7 @@
 int main(){
     printf("Testing custom system call\n");
     info(0);
-    info(1);
+    printf("--1. Number of processes running --\n");
+    printf("---------%d---------\n", info(1));
     exit(0);
 }
