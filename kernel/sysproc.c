@@ -104,7 +104,13 @@ sys_info(void)
     printf("Wrong Parameter\n");
     return -1;
   }
-  printf("System Call running!\n");
-  return 0;  
 
+  // implementing function to count number of processes
+  // Actual logic implemented in proccount function in proc.c
+  else if (param==1)
+  {
+    return proccount();
+  }
+  
+  return 0;  
 }
