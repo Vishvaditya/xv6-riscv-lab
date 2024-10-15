@@ -124,6 +124,7 @@ allocproc(void)
 found:
   p->pid = allocpid();
   p->state = USED;
+  p->num_sys_call = 0; // initialized num_sys_call as 0
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
@@ -169,6 +170,7 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->state = UNUSED;
+  p->num_sys_call =0; // setting num of system calls to 0 when freeing processor
 }
 
 // Create a user page table for a given process, with no user memory,
