@@ -111,6 +111,11 @@ sys_info(void)
   {
     return proccount();
   }
+
+  else if (param==2)
+  {
+    return myproc()->num_sys_call;  // Code to output custom generated num_sys_call attribute of process
+  }
   
   return 0;  
 }
