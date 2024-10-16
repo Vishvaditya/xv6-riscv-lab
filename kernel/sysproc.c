@@ -116,6 +116,11 @@ sys_info(void)
   {
     return myproc()->num_sys_call;  // Code to output custom generated num_sys_call attribute of process
   }
+
+  else if (param==3)
+  {
+    return PGROUNDUP(myproc()->sz)/PGSIZE;  // Getting number of memory pages by rounding up current process memory by PGSIZE
+  }
   
   return 0;  
 }
