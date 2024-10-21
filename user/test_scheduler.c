@@ -6,7 +6,7 @@ const int MAX_TICKETS = 1 << 10;
 
 int main(int argc, char **argv) {
     if (argc < 4) {
-        printf("Usage: %s [SLEEP_TIME in ms] [N_PROC] [TICKET1] [TICKET2]...\n", argv[0]);
+        printf("Usage: %s [SLEEP_TIME in ticks] [N_PROC] [TICKET1] [TICKET2]...\n", argv[0]);
         exit(-1);
     }
     int sleep_time = atoi(argv[1]);
