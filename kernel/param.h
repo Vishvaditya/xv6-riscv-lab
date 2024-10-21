@@ -12,4 +12,5 @@
 #define FSSIZE       2000  // size of file system in blocks
 #define MAXPATH      128   // maximum file path name
 #define USERSTACK    1     // user stack pages
-
+#define STRIDE1      (1<<16)     // stride value for stride scheduling
+#define DEFAULT_TICKS (1<<10) // default time slice for stride scheduling

@@ -124,6 +124,10 @@ allocproc(void)
 found:
   p->pid = allocpid();
   p->state = USED;
+  p->tickets = DEFAULT_TICKS;
+  p->stride = STRIDE1 / p->tickets;
+  p->pass = p->stride;
+  p->ticks = 0;
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
@@ -169,6 +173,10 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->state = UNUSED;
+  p->tickets = 0;
+  p->stride = 0;
+  p->pass = 0;
+  p->ticks = 0;
 }
 
 // Create a user page table for a given process, with no user memory,
@@ -441,6 +449,7 @@ wait(uint64 addr)
 //  - swtch to start running that process.
 //  - eventually that process transfers control
 //    via swtch back to the scheduler.
+#if !defined(SCHEDULER) || (SCHEDULER != LOTTERY && SCHEDULER != STRIDE)
 void
 scheduler(void)
 {
@@ -464,6 +473,7 @@ scheduler(void)
         p->state = RUNNING;
         c->proc = p;
         swtch(&c->context, &p->context);
+        ++p->ticks;  // Increment the tick count for the process.
 
         // Process is done running for now.
         // It should have changed its p->state before coming back.
@@ -479,6 +489,26 @@ scheduler(void)
     }
   }
 }
+
+#elif SCHEDULER == LOTTERY
+/**
+ * TODO: Implement the lottery scheduler.
+ */
+void
+scheduler(void)
+{
+
+}
+#elif SCHEDULER == STRIDE
+/**
+ * TODO: Implement the stride scheduler.
+ */
+void
+scheduler(void)
+{
+
+}
+#endif
 
 // Switch to scheduler.  Must hold only p->lock
 // and have changed proc->state. Saves and restores
@@ -692,4 +722,25 @@ procdump(void)
     printf("%d %s %s", p->pid, state, p->name);
     printf("\n");
   }
+}
+
+void proc_set_tickets(int tickets) {
+  struct proc *p = myproc();
+  acquire(&p->lock);
+  p->tickets = tickets;
+  p->stride = STRIDE1 / p->tickets;
+  release(&p->lock);
+}
+
+int getticks(int pid) {
+  struct proc *p;
+  for (p = proc; p < &proc[NPROC]; p++) {
+    acquire(&p->lock);
+    if (p->pid == pid) {
+      release(&p->lock);
+      return p->ticks;
+    }
+    release(&p->lock);
+  }
+  return -1;
 }
