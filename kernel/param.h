@@ -14,3 +14,5 @@
 #define USERSTACK    1     // user stack pages
 #define STRIDE1      (1<<16)     // stride value for stride scheduling
 #define DEFAULT_TICKS (1<<10) // default time slice for stride scheduling
+#define LOTTERY      1 // lottery scheduling
+#define STRIDE       2 // stride scheduling
