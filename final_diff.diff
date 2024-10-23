@@ -1,0 +1,449 @@
+diff --git a/Makefile b/Makefile
+index f8c820e..fd5ce8d 100644
+--- a/Makefile
++++ b/Makefile
+@@ -139,7 +139,9 @@ UPROGS=\
+ 	$U/_grind\
+ 	$U/_wc\
+ 	$U/_zombie\
+-
++	$U/_test_info_run\
++	$U/_test_info\
++	
+ fs.img: mkfs/mkfs README $(UPROGS)
+ 	mkfs/mkfs fs.img README $(UPROGS)
+ 
+diff --git a/kernel/defs.h b/kernel/defs.h
+index d1b6bb9..8ee4772 100644
+--- a/kernel/defs.h
++++ b/kernel/defs.h
+@@ -106,6 +106,7 @@ void            yield(void);
+ int             either_copyout(int user_dst, uint64 dst, void *src, uint64 len);
+ int             either_copyin(void *dst, int user_src, uint64 src, uint64 len);
+ void            procdump(void);
++int             proccount(void);  // function definition in header
+ 
+ // swtch.S
+ void            swtch(struct context*, struct context*);
+diff --git a/kernel/proc.c b/kernel/proc.c
+index 130d9ce..6aeca05 100644
+--- a/kernel/proc.c
++++ b/kernel/proc.c
+@@ -124,6 +124,7 @@ allocproc(void)
+ found:
+   p->pid = allocpid();
+   p->state = USED;
++  p->num_sys_call = 0; // initialized num_sys_call as 0
+ 
+   // Allocate a trapframe page.
+   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
+@@ -169,6 +170,7 @@ freeproc(struct proc *p)
+   p->killed = 0;
+   p->xstate = 0;
+   p->state = UNUSED;
++  p->num_sys_call =0; // setting num of system calls to 0 when freeing processor
+ }
+ 
+ // Create a user page table for a given process, with no user memory,
+@@ -693,3 +695,18 @@ procdump(void)
+     printf("\n");
+   }
+ }
++
++// Function to count number of processes running
++int
++proccount(void)
++{
++  struct proc *p;
++  int proc_count = 0;
++
++  for(p=proc; p< &proc[NPROC]; p++)
++  {
++    if (p->state != UNUSED)
++      proc_count++;
++  }
++  return proc_count;
++}
+diff --git a/kernel/proc.h b/kernel/proc.h
+index d021857..56863fe 100644
+--- a/kernel/proc.h
++++ b/kernel/proc.h
+@@ -91,6 +91,7 @@ struct proc {
+   int killed;                  // If non-zero, have been killed
+   int xstate;                  // Exit status to be returned to parent's wait
+   int pid;                     // Process ID
++  int num_sys_call;            // Number of System Calls made by the process
+ 
+   // wait_lock must be held when using this:
+   struct proc *parent;         // Parent process
+diff --git a/kernel/syscall.c b/kernel/syscall.c
+index ed65409..a3494fd 100644
+--- a/kernel/syscall.c
++++ b/kernel/syscall.c
+@@ -101,6 +101,7 @@ extern uint64 sys_unlink(void);
+ extern uint64 sys_link(void);
+ extern uint64 sys_mkdir(void);
+ extern uint64 sys_close(void);
++extern uint64 sys_info(void); // Added prototype for the new system call
+ 
+ // An array mapping syscall numbers from syscall.h
+ // to the function that handles the system call.
+@@ -126,6 +127,7 @@ static uint64 (*syscalls[])(void) = {
+ [SYS_link]    sys_link,
+ [SYS_mkdir]   sys_mkdir,
+ [SYS_close]   sys_close,
++[SYS_info]    sys_info, // Added array mapping for new system call
+ };
+ 
+ void
+@@ -139,6 +141,7 @@ syscall(void)
+     // Use num to lookup the system call function for num, call it,
+     // and store its return value in p->trapframe->a0
+     p->trapframe->a0 = syscalls[num]();
++    p->num_sys_call++;  // Incrementing the num_sys_call whenever a successfull system call is made
+   } else {
+     printf("%d %s: unknown sys call %d\n",
+             p->pid, p->name, num);
+diff --git a/kernel/syscall.h b/kernel/syscall.h
+index bc5f356..6cd6509 100644
+--- a/kernel/syscall.h
++++ b/kernel/syscall.h
+@@ -20,3 +20,4 @@
+ #define SYS_link   19
+ #define SYS_mkdir  20
+ #define SYS_close  21
++#define SYS_info   22   // Added new custom system call number
+diff --git a/kernel/sysproc.c b/kernel/sysproc.c
+index 3b4d5bd..c6fcfcc 100644
+--- a/kernel/sysproc.c
++++ b/kernel/sysproc.c
+@@ -91,3 +91,36 @@ sys_uptime(void)
+   release(&tickslock);
+   return xticks;
+ }
++
++
++// sys_info implementation of system call function
++uint64
++sys_info(void)
++{
++  int param;
++  argint(0, &param);
++  if(param<=0)
++  {
++    printf("Wrong Parameter\n");
++    return -1;
++  }
++
++  // implementing function to count number of processes
++  // Actual logic implemented in proccount function in proc.c
++  else if (param==1)
++  {
++    return proccount();
++  }
++
++  else if (param==2)
++  {
++    return myproc()->num_sys_call;  // Code to output custom generated num_sys_call attribute of process
++  }
++
++  else if (param==3)
++  {
++    return PGROUNDUP(myproc()->sz)/PGSIZE;  // Getting number of memory pages by rounding up current process memory by PGSIZE
++  }
++  
++  return 0;  
++}
+diff --git a/test_diff.diff b/test_diff.diff
+new file mode 100644
+index 0000000..1e38a73
+--- /dev/null
++++ b/test_diff.diff
+@@ -0,0 +1,219 @@
++diff --git a/Makefile b/Makefile
++index f8c820e..fd5ce8d 100644
++--- a/Makefile
+++++ b/Makefile
++@@ -139,7 +139,9 @@ UPROGS=\
++ 	$U/_grind\
++ 	$U/_wc\
++ 	$U/_zombie\
++-
+++	$U/_test_info_run\
+++	$U/_test_info\
+++	
++ fs.img: mkfs/mkfs README $(UPROGS)
++ 	mkfs/mkfs fs.img README $(UPROGS)
++ 
++diff --git a/kernel/defs.h b/kernel/defs.h
++index d1b6bb9..8ee4772 100644
++--- a/kernel/defs.h
+++++ b/kernel/defs.h
++@@ -106,6 +106,7 @@ void            yield(void);
++ int             either_copyout(int user_dst, uint64 dst, void *src, uint64 len);
++ int             either_copyin(void *dst, int user_src, uint64 src, uint64 len);
++ void            procdump(void);
+++int             proccount(void);  // function definition in header
++ 
++ // swtch.S
++ void            swtch(struct context*, struct context*);
++diff --git a/kernel/proc.c b/kernel/proc.c
++index 130d9ce..6aeca05 100644
++--- a/kernel/proc.c
+++++ b/kernel/proc.c
++@@ -124,6 +124,7 @@ allocproc(void)
++ found:
++   p->pid = allocpid();
++   p->state = USED;
+++  p->num_sys_call = 0; // initialized num_sys_call as 0
++ 
++   // Allocate a trapframe page.
++   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
++@@ -169,6 +170,7 @@ freeproc(struct proc *p)
++   p->killed = 0;
++   p->xstate = 0;
++   p->state = UNUSED;
+++  p->num_sys_call =0; // setting num of system calls to 0 when freeing processor
++ }
++ 
++ // Create a user page table for a given process, with no user memory,
++@@ -693,3 +695,18 @@ procdump(void)
++     printf("\n");
++   }
++ }
+++
+++// Function to count number of processes running
+++int
+++proccount(void)
+++{
+++  struct proc *p;
+++  int proc_count = 0;
+++
+++  for(p=proc; p< &proc[NPROC]; p++)
+++  {
+++    if (p->state != UNUSED)
+++      proc_count++;
+++  }
+++  return proc_count;
+++}
++diff --git a/kernel/proc.h b/kernel/proc.h
++index d021857..56863fe 100644
++--- a/kernel/proc.h
+++++ b/kernel/proc.h
++@@ -91,6 +91,7 @@ struct proc {
++   int killed;                  // If non-zero, have been killed
++   int xstate;                  // Exit status to be returned to parent's wait
++   int pid;                     // Process ID
+++  int num_sys_call;            // Number of System Calls made by the process
++ 
++   // wait_lock must be held when using this:
++   struct proc *parent;         // Parent process
++diff --git a/kernel/syscall.c b/kernel/syscall.c
++index ed65409..a3494fd 100644
++--- a/kernel/syscall.c
+++++ b/kernel/syscall.c
++@@ -101,6 +101,7 @@ extern uint64 sys_unlink(void);
++ extern uint64 sys_link(void);
++ extern uint64 sys_mkdir(void);
++ extern uint64 sys_close(void);
+++extern uint64 sys_info(void); // Added prototype for the new system call
++ 
++ // An array mapping syscall numbers from syscall.h
++ // to the function that handles the system call.
++@@ -126,6 +127,7 @@ static uint64 (*syscalls[])(void) = {
++ [SYS_link]    sys_link,
++ [SYS_mkdir]   sys_mkdir,
++ [SYS_close]   sys_close,
+++[SYS_info]    sys_info, // Added array mapping for new system call
++ };
++ 
++ void
++@@ -139,6 +141,7 @@ syscall(void)
++     // Use num to lookup the system call function for num, call it,
++     // and store its return value in p->trapframe->a0
++     p->trapframe->a0 = syscalls[num]();
+++    p->num_sys_call++;  // Incrementing the num_sys_call whenever a successfull system call is made
++   } else {
++     printf("%d %s: unknown sys call %d\n",
++             p->pid, p->name, num);
++diff --git a/kernel/syscall.h b/kernel/syscall.h
++index bc5f356..6cd6509 100644
++--- a/kernel/syscall.h
+++++ b/kernel/syscall.h
++@@ -20,3 +20,4 @@
++ #define SYS_link   19
++ #define SYS_mkdir  20
++ #define SYS_close  21
+++#define SYS_info   22   // Added new custom system call number
++diff --git a/kernel/sysproc.c b/kernel/sysproc.c
++index 3b4d5bd..04b174f 100644
++--- a/kernel/sysproc.c
+++++ b/kernel/sysproc.c
++@@ -91,3 +91,31 @@ sys_uptime(void)
++   release(&tickslock);
++   return xticks;
++ }
+++
+++
+++// sys_info implementation of system call function
+++uint64
+++sys_info(void)
+++{
+++  int param;
+++  argint(0, &param);
+++  if(param<=0)
+++  {
+++    printf("Wrong Parameter\n");
+++    return -1;
+++  }
+++
+++  // implementing function to count number of processes
+++  // Actual logic implemented in proccount function in proc.c
+++  else if (param==1)
+++  {
+++    return proccount();
+++  }
+++
+++  else if (param==2)
+++  {
+++    return myproc()->num_sys_call;  // Code to output custom generated num_sys_call attribute of process
+++  }
+++  
+++  return 0;  
+++}
++diff --git a/user/test_info.c b/user/test_info.c
++new file mode 100644
++index 0000000..9fc900a
++--- /dev/null
+++++ b/user/test_info.c
++@@ -0,0 +1,12 @@
+++#include "kernel/types.h"
+++#include "kernel/stat.h"
+++#include "user/user.h"
+++
+++int main() {
+++    printf("Total number of system calls made by current process: %d\n", info(2));
+++    printf("Total number of processes: %d\n", info(1));
+++    printf("Total number of system calls made by current process: %d\n", info(2));
+++    printf("Total number of memory pages used by current process: %d\n", info(3));
+++    printf("Total number of system calls made by current process: %d\n", info(2));
+++    exit(0);
+++}
++\ No newline at end of file
++diff --git a/user/test_info_run.c b/user/test_info_run.c
++new file mode 100644
++index 0000000..56cfbc6
++--- /dev/null
+++++ b/user/test_info_run.c
++@@ -0,0 +1,21 @@
+++// Sample program to run custom system call
+++
+++#include "kernel/types.h"
+++#include "kernel/stat.h"
+++#include "user.h"
+++
+++int main(){
+++    printf("Testing custom system call\n");
+++    info(0);
+++    // printf("--1. Number of processes running --\n");
+++    // printf("---------%d---------\n", info(1));
+++    printf("--2. Number of system calls by the current process --\n");
+++    printf("---------%d---------\n", info(2));
+++    for(int i = 0; i < 5; i++)
+++    {
+++    write(1, ".", 1);
+++    }
+++  
+++    printf("\nSystem call count after writes: %d\n", info(2));
+++    exit(0);
+++}
++\ No newline at end of file
++diff --git a/user/user.h b/user/user.h
++index f16fe27..d87388e 100644
++--- a/user/user.h
+++++ b/user/user.h
++@@ -22,6 +22,7 @@ int getpid(void);
++ char* sbrk(int);
++ int sleep(int);
++ int uptime(void);
+++int info(int); // declaration for system call in user space
++ 
++ // ulib.c
++ int stat(const char*, struct stat*);
++diff --git a/user/usys.pl b/user/usys.pl
++index 01e426e..509a943 100755
++--- a/user/usys.pl
+++++ b/user/usys.pl
++@@ -36,3 +36,4 @@ entry("getpid");
++ entry("sbrk");
++ entry("sleep");
++ entry("uptime");
+++entry("info");  #entry for new system call user function
+diff --git a/user/test_info.c b/user/test_info.c
+new file mode 100644
+index 0000000..9fc900a
+--- /dev/null
++++ b/user/test_info.c
+@@ -0,0 +1,12 @@
++#include "kernel/types.h"
++#include "kernel/stat.h"
++#include "user/user.h"
++
++int main() {
++    printf("Total number of system calls made by current process: %d\n", info(2));
++    printf("Total number of processes: %d\n", info(1));
++    printf("Total number of system calls made by current process: %d\n", info(2));
++    printf("Total number of memory pages used by current process: %d\n", info(3));
++    printf("Total number of system calls made by current process: %d\n", info(2));
++    exit(0);
++}
+\ No newline at end of file
+diff --git a/user/test_info_run.c b/user/test_info_run.c
+new file mode 100644
+index 0000000..56cfbc6
+--- /dev/null
++++ b/user/test_info_run.c
+@@ -0,0 +1,21 @@
++// Sample program to run custom system call
++
++#include "kernel/types.h"
++#include "kernel/stat.h"
++#include "user.h"
++
++int main(){
++    printf("Testing custom system call\n");
++    info(0);
++    // printf("--1. Number of processes running --\n");
++    // printf("---------%d---------\n", info(1));
++    printf("--2. Number of system calls by the current process --\n");
++    printf("---------%d---------\n", info(2));
++    for(int i = 0; i < 5; i++)
++    {
++    write(1, ".", 1);
++    }
++  
++    printf("\nSystem call count after writes: %d\n", info(2));
++    exit(0);
++}
+\ No newline at end of file
+diff --git a/user/user.h b/user/user.h
+index f16fe27..d87388e 100644
+--- a/user/user.h
++++ b/user/user.h
+@@ -22,6 +22,7 @@ int getpid(void);
+ char* sbrk(int);
+ int sleep(int);
+ int uptime(void);
++int info(int); // declaration for system call in user space
+ 
+ // ulib.c
+ int stat(const char*, struct stat*);
+diff --git a/user/usys.pl b/user/usys.pl
+index 01e426e..509a943 100755
+--- a/user/usys.pl
++++ b/user/usys.pl
+@@ -36,3 +36,4 @@ entry("getpid");
+ entry("sbrk");
+ entry("sleep");
+ entry("uptime");
++entry("info");  #entry for new system call user function
