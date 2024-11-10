@@ -497,15 +497,17 @@ scheduler(void)
 void
 scheduler(void)
 {
+  // Inititalizing process and CPU
   struct proc *p;
   struct cpu *c = mycpu();
   c->proc = 0;
 
   for (;;){
     intr_on();
-    int tickets_total = 0;
-    int is_proc = 0;
+    int tickets_total = 0; // Initializing total number of tickets
+    int is_proc = 0; // Process selected or not
 
+    // For loop to check total number of tickets
     for(p=proc; p<&proc[NPROC]; p++){
       acquire(&p->lock);
       if(p->state==RUNNABLE){
@@ -514,14 +516,16 @@ scheduler(void)
       release(&p->lock);
     }
 
+    // If total tickets is 0 then turning interrupt on
     if(tickets_total==0){
       intr_on();
       asm volatile("wfi");
     }
 
-    int winner = random()%tickets_total;
+    int winner = random()%tickets_total; // Generating winner ticket using random
     int curr_ticket = 0;
 
+    // Loop to find process with winning ticket
     for(p=proc; p<&proc[NPROC]; p++){
       acquire(&p->lock);
 
@@ -532,9 +536,9 @@ scheduler(void)
           p->state = RUNNING;
           c->proc = p;
 
-          swtch(&c->context, &p->context);
+          swtch(&c->context, &p->context); // Context switch to winning process
 
-          ++p->ticks;
+          ++p->ticks; // Incrementing tick counts
 
           c->proc = 0;
           is_proc=1;
