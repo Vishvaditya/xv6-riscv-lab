@@ -497,9 +497,9 @@ scheduler(void)
 void
 scheduler(void)
 {
-  struct proc *p
-  struct cpu *c = mycpu()
-  c->proc = 0
+  struct proc *p;
+  struct cpu *c = mycpu();
+  c->proc = 0;
 
   for (;;){
     intr_on();
@@ -511,7 +511,7 @@ scheduler(void)
       if(p->state==RUNNABLE){
         tickets_total += p->tickets;
       }
-      release(&p->lock)
+      release(&p->lock);
     }
 
     if(tickets_total==0){
