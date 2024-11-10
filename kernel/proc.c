@@ -564,6 +564,7 @@ scheduler(void)
 void
 scheduler(void)
 {
+  // Inititalizing process, CPU and process with minimum pass value
   struct proc *p; 
   struct proc *proc_min;
   struct cpu *c = mycpu();
@@ -571,8 +572,9 @@ scheduler(void)
 
   for(;;){
     intr_on();
-    proc_min = 0;
+    proc_min = 0; // Setting proc_min to zero before each scheduling loop
 
+    // Checking which process has lowest pass value
     for(p=proc; p<&proc[NPROC]; p++){
       acquire(&p->lock);
 
@@ -587,12 +589,12 @@ scheduler(void)
     if(proc_min){
       acquire(&proc_min->lock);
 
-      proc_min->state = RUNNING;
-      proc_min->pass += proc_min->stride;
+      proc_min->state = RUNNING; // Setting state of process with min pass value to RUNNING
+      proc_min->pass += proc_min->stride; // Increasing pass value of the process by the stride of that process
       c->proc = proc_min;
 
-      swtch(&c->context, &proc_min->context);
-      ++proc_min->ticks;
+      swtch(&c->context, &proc_min->context); //Context switching to the process
+      ++proc_min->ticks;  // Counting ticks for the process
 
       c->proc = 0;
       release(&proc_min->lock);
