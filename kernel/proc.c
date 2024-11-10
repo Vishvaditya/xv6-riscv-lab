@@ -564,7 +564,44 @@ scheduler(void)
 void
 scheduler(void)
 {
+  struct proc *p; 
+  struct proc *proc_min;
+  struct cpu *c = mycpu();
+  c->proc = 0;
 
+  for(;;){
+    intr_on();
+    proc_min = 0;
+
+    for(p=proc; p<&proc[NPROC]; p++){
+      acquire(&p->lock);
+
+      if(p->state==RUNNABLE){
+        if(!proc_min || p->pass < proc_min->pass){
+          proc_min = p;
+        }
+      }
+      release(&p->lock);
+    }
+
+    if(proc_min){
+      acquire(&proc_min->lock);
+
+      proc_min->state = RUNNING;
+      proc_min->pass += proc_min->stride;
+      c->proc = proc_min;
+
+      swtch(&c->context, &proc_min->context);
+      ++proc_min->ticks;
+
+      c->proc = 0;
+      release(&proc_min->lock);
+    }
+    else{
+      intr_on();
+      asm volatile("wfi");
+    }
+  }
 }
 #endif
 
