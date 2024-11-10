@@ -497,8 +497,62 @@ scheduler(void)
 void
 scheduler(void)
 {
+  struct proc *p
+  struct cpu *c = mycpu()
+  c->proc = 0
 
+  for (;;){
+    intr_on();
+    int tickets_total = 0;
+    int is_proc = 0;
+
+    for(p=proc; p<&proc[NPROC]; p++){
+      acquire(&p->lock);
+      if(p->state==RUNNABLE){
+        tickets_total += p->tickets;
+      }
+      release(&p->lock)
+    }
+
+    if(tickets_total==0){
+      intr_on();
+      asm volatile("wfi");
+    }
+
+    int winner = random()%tickets_total;
+    int curr_ticket = 0;
+
+    for(p=proc; p<&proc[NPROC]; p++){
+      acquire(&p->lock);
+
+      if(p->state==RUNNABLE){
+        curr_ticket += p->tickets;
+
+        if(curr_ticket > winner){
+          p->state = RUNNING;
+          c->proc = p;
+
+          swtch(&c->context, &p->context);
+
+          ++p->ticks;
+
+          c->proc = 0;
+          is_proc=1;
+          release(&p->lock);
+          break;
+        }
+      }
+      release(&p->lock);
+    }
+    
+    if(!is_proc){
+      intr_on();
+      asm volatile("wfi");
+    }
+  }
 }
+
+
 #elif SCHEDULER == STRIDE
 /**
  * TODO: Implement the stride scheduler.
