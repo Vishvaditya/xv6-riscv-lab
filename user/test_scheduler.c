@@ -25,6 +25,8 @@ int main(int argc, char **argv) {
     }
 
     int *childs = malloc(n_proc * sizeof(int));
+
+    // for(int iter=0; iter<10; iter++){
     for (int i = 0; i < n_proc; ++i) {
         int pid = fork();
         if (pid == 0) {
@@ -40,10 +42,11 @@ int main(int argc, char **argv) {
             exit(-1);
         }
     }
-    sleep(sleep_time);
+    sleep(sleep_time); //+10*iter
     for (int i = 0; i < n_proc; ++i) {
         printf("Child PID: %d, ticks spent: %d\n", childs[i], getticks(childs[i]));
         kill(childs[i]);
     }
+    // }
     return 0;
 }
