@@ -121,9 +121,26 @@ walkaddr(pagetable_t pagetable, uint64 va)
     return 0;
   if((*pte & PTE_U) == 0)
     return 0;
-  pa = PTE2PA(*pte);
+  pa = PTE2PA(*pte);  // 
   return pa;
 }
+
+uint64
+walkaddr_updt(pagetable_t pagetable, uint64 va)
+{
+  pte_t *pte;
+  uint64 pa;
+
+  if(va >= MAXVA)
+    return 0;
+
+  pte = walk(pagetable, va, 0);
+  if(pte == 0)
+    return 0;
+    
+  return pa;
+}
+
 
 // add a mapping to the kernel page table.
 // only used when booting.

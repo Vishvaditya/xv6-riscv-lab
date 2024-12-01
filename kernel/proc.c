@@ -172,7 +172,84 @@ found:
 static struct proc*
 allocthread(struct proc *parent)
 {
+  struct proc *t;
+  for(t = proc; t < &proc[NPROC]; t++) {
+    acquire(&t->lock);
+    if(t->state == UNUSED) {
+      goto found;
+    }
+  }
+  release(&t->lock);
+  return 0;
 
+  found:
+    t->parent = parent;
+    t->thread_id = ++parent->thread_count;
+    t->state = USED;
+
+    // share parent pagetable
+    t->pagetable = parent->pagetable;
+    t->sz = parent->sz;
+
+
+    t->thread_va = 0;
+    for (uint64 va = TRAMPOLINE - PGSIZE; t->thread_va >= parent->sz; t->thread_va -= PGSIZE) {
+      if (walkaddr_updt(parent->pagetable, va) == 0) { // Check if the page is unused (using modified walkaddr)
+        t->thread_va = va;
+        break;
+      }
+    }
+
+    if (t->thread_va == 0) {
+      release(&t->lock);
+      return 0; // No available page found for the kernel stack
+    }
+
+    char *kstack_mem = kalloc();
+    if (kstack_mem == 0) {
+      release(&t->lock);
+      return 0; // If memory allocation for the stack fails
+    }
+
+    // Copy trapframe from parent
+    t->trapframe = (struct trapframe *)kalloc();
+    if(t->trapframe == 0) {
+        kfree((void*)t->kstack);
+        t->kstack = 0;
+        t->state = UNUSED;
+        release(&t->lock);
+        return 0;
+    }
+
+
+
+    // Map the kernel stack in the parent's page table
+    if (mappages(parent->pagetable, t->thread_va, PGSIZE, (uint64)kstack_mem, PTE_R | PTE_W) < 0) {
+      kfree(kstack_mem);
+      kfree(t->trapframe);
+      release(&t->lock);
+      return 0;
+    }
+
+    t->kstack = t->thread_va;
+
+    *(t->trapframe) = *(parent->trapframe);
+    t->trapframe->sp = parent->trapframe->sp;
+
+    uint64 sp = t->kstack + PGSIZE; // Stack grows downward
+    sp -= sizeof(*t->trapframe);
+    *(struct trapframe *)sp = *t->trapframe;
+
+    t->context.sp = sp;
+    t->context.ra = (uint64)forkret;
+
+    // Initialize thread state
+    t->state = RUNNABLE;
+    release(&t->lock);
+      
+// traverse the page table and find free page to allocate kstack (see vm.c/walkaddr) (procpagetable/mappages)
+
+    return t;
 }
 
 // free a proc structure and the data hanging from it,
@@ -189,18 +266,40 @@ static void
 freeproc(struct proc *p)
 {
   if(p->trapframe)
-    kfree((void*)p->trapframe);
+    kfree((void *)p->trapframe);
   p->trapframe = 0;
-  if(p->pagetable)
+
+  if(p->thread_count>0){
+    if(p->parent)
+      p->parent->thread_count--;
+  }
+
+  if(p->kstack)
+    kfree((void *)p->kstack);
+
+  if(p->thread_id>0){
+    p->pagetable=0;
+  }
+  else{
+    if(p->pagetable)
     proc_freepagetable(p->pagetable, p->sz);
+  }
+
+  // p->pagetable = 0;
+  // p->sz = 0;
+  // p->pid = 0;
+  // p->parent = 0;
+  // p->name[0] = 0;
+  // p->chan = 0;
+  // p->killed = 0;
+  // p->xstate = 0;
+  // p->state = UNUSED;
+
+  p->trapframe = 0;
+  p->kstack = 0;
   p->pagetable = 0;
-  p->sz = 0;
-  p->pid = 0;
   p->parent = 0;
-  p->name[0] = 0;
-  p->chan = 0;
-  p->killed = 0;
-  p->xstate = 0;
+  p->thread_id = 0;
   p->state = UNUSED;
 }
 
@@ -276,7 +375,19 @@ proc_freepagetable(pagetable_t pagetable, uint64 sz)
 void
 thread_freepagetable(pagetable_t pagetable, int thread_id, uint64 kstack)
 {
-  
+  if (thread_id <= 0) {
+    // Log error or handle invalid thread ID
+    printf("Error: Invalid thread ID %d\n", thread_id);
+    return;
+  }
+
+  // Remove the trapframe mapping for this specific thread
+  uvmunmap(pagetable, TRAPFRAME, 1, 1);
+
+  // Free the kernel stack
+  if (kstack) {
+    kfree((void*)kstack);
+  }
 }
 
 // a user program that calls exec("/init")
@@ -401,7 +512,45 @@ fork(void)
 int
 clone(void *stack) 
 {
+  struct proc *p = myproc(); // Get the current process (parent thread)
+  struct proc *np;
 
+  // Allocate a new thread (similar to fork)
+  if ((np = allocthread(p)) == 0) {
+    return -1; // No available slots for new thread
+  }
+
+  // Set up the new thread's user stack
+  if ((uint64)stack % PGSIZE != 0) {
+    // Stack pointer must be page-aligned
+    freeproc(np);
+    return -1;
+  }
+  np->trapframe->sp = (uint64)stack + PGSIZE; // Set the stack pointer to the top of the new stack      // not alligned 
+
+  // Copy trapframe to the new thread
+  *(np->trapframe) = *(p->trapframe); // Copy parent's trapframe
+  np->trapframe->sp = (uint64)stack + PGSIZE; // Adjust stack pointer for the new thread
+  np->trapframe->sp -= np->trapframe->sp%16;
+  np->trapframe->a0 = 0; // Return 0 in the child thread
+
+  // Share the same address space and file descriptors
+  np->pagetable = p->pagetable; // Share parent's page table
+  for (int i = 0; i < NOFILE; i++) {
+    np->ofile[i] = p->ofile[i]; // Copy each file descriptor
+    if (np->ofile[i]) {
+      filedup(np->ofile[i]); // Increment the reference count         /// Don't need the if
+    }
+  }
+  np->cwd = p->cwd;             // Share current working directory
+  np->parent = p;               // Set the parent process
+
+  // Add to the scheduler
+  acquire(&np->lock);
+  np->state = RUNNABLE;
+  release(&np->lock);
+
+  return np->thread_id; // Return the new thread ID
 }
 
 // Pass p's abandoned children to init.

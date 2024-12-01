@@ -17,6 +17,12 @@
  * 
  */
 int thread_create(void *(*start_routine)(void*), void *arg) {
+    int pid = fork();
+    if(pid == 0) { // child
+        start_routine(arg);
+        exit(0);
+    }
+    return pid;
 
 }
 
@@ -29,7 +35,7 @@ int thread_create(void *(*start_routine)(void*), void *arg) {
  * @param lk The lock to be initialized.
  */
 void lock_init(struct lock_t* lk) {
-    
+    lk->locked = 0;             // Mark the lock as initially unlocked
 }
 
 /**
@@ -39,6 +45,9 @@ void lock_init(struct lock_t* lk) {
  * @param lk The lock to be acquired.
  */
 void lock_acquire(struct lock_t* lk) {
+    while (__sync_lock_test_and_set(&lk->locked, 1)) {
+        // Busy-wait until the lock becomes available
+    }
 
 }
 
@@ -49,5 +58,5 @@ void lock_acquire(struct lock_t* lk) {
  * @param lk The lock to be released.
  */
 void lock_release(struct lock_t* lk) {
-
+    __sync_lock_release(&lk->locked);
 }
