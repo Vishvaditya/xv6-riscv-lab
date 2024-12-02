@@ -272,10 +272,10 @@ freeproc(struct proc *p)
   // p->sz = 0;
   // p->pid = 0;
   // p->parent = 0;
-  // p->name[0] = 0;
-  // p->chan = 0;
-  // p->killed = 0;
-  // p->xstate = 0;
+  p->name[0] = 0;
+  p->chan = 0;
+  p->killed = 0;
+  p->xstate = 0;
   // p->state = UNUSED;
 
   p->trapframe = 0;
@@ -495,7 +495,7 @@ fork(void)
 int
 clone(void *stack) 
 {
-  printf("INIT CLONE FN\n");
+  // printf("INIT CLONE FN\n");
   struct proc *p = myproc(); // Get the current process (parent thread)
   struct proc *t;
 
@@ -530,7 +530,7 @@ clone(void *stack)
   t->state = RUNNABLE;
   int curr_tid;
   curr_tid = t->thread_id;
-  printf("Thread created with id : %d", curr_tid);
+  // printf("Thread created with id : %d", curr_tid);
   release(&t->lock);
   return curr_tid; // Return the new thread ID
 }
@@ -560,6 +560,22 @@ exit(int status)
 
   if(p == initproc)
     panic("init exiting");
+
+  // if(p->thread_id > 0){
+  //   // Atomic decrement
+  //   __sync_fetch_and_sub(&p->parent->thread_count, 1);
+    
+  //   // Safer resource freeing
+  //   if(p->kstack) {
+  //     kfree((void *)p->kstack);
+  //     p->kstack = 0;
+  //   }
+    
+  //   if(p->trapframe) {
+  //     kfree((void*)p->trapframe);
+  //     p->trapframe = 0;
+  //   }
+  // }
 
   // Close all open files.
   for(int fd = 0; fd < NOFILE; fd++){

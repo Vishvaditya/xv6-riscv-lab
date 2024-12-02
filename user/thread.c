@@ -24,7 +24,7 @@ int thread_create(void *(*start_routine)(void*), void *arg) {
 
     // printf("Calling Clone Function \n");
     thread_id = clone((void *)stack);
-    printf("THREAD ID: %d", thread_id);
+    // printf("THREAD ID: %d", thread_id);
     if(thread_id != 0) {
         return 0;
     }
