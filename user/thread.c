@@ -17,13 +17,21 @@
  * 
  */
 int thread_create(void *(*start_routine)(void*), void *arg) {
-    int pid = fork();
-    if(pid == 0) { // child
-        start_routine(arg);
-        exit(0);
-    }
-    return pid;
+    void *stack = malloc(2*PGSIZE);
+    // printf("Initialized Stack\n");
+    
+    int thread_id;
 
+    // printf("Calling Clone Function \n");
+    thread_id = clone((void *)stack);
+    printf("THREAD ID: %d", thread_id);
+    if(thread_id != 0) {
+        return 0;
+    }
+    start_routine(arg);
+    free(stack);
+    exit(0);
+    return thread_id;
 }
 
 
@@ -45,9 +53,10 @@ void lock_init(struct lock_t* lk) {
  * @param lk The lock to be acquired.
  */
 void lock_acquire(struct lock_t* lk) {
-    while (__sync_lock_test_and_set(&lk->locked, 1)) {
+    while (__sync_lock_test_and_set(&lk->locked, 1)!=0) {
         // Busy-wait until the lock becomes available
     }
+    __sync_synchronize();
 
 }
 

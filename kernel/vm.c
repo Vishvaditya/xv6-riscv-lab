@@ -137,7 +137,8 @@ walkaddr_updt(pagetable_t pagetable, uint64 va)
   pte = walk(pagetable, va, 0);
   if(pte == 0)
     return 0;
-    
+
+  pa = PTE2PA(*pte);  
   return pa;
 }
 

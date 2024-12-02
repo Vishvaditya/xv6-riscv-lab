@@ -8,11 +8,14 @@ int n_threads, n_passes, cur_turn, cur_pass;
 
 void *thread_fn(void *arg)
 {
+	// printf("Initializing thread function\n");
 	int thread_id = (uint64)arg;
 	int done = 0;
 	while (!done)
 	{
 		lock_acquire(&lock);
+		printf("Thread_id: %d\n", thread_id);
+
 		if (cur_pass >= n_passes)
 			done = 1;
 		else if (cur_turn == thread_id)
@@ -29,6 +32,7 @@ void *thread_fn(void *arg)
 
 int main(int argc, char *argv[])
 {
+	// printf("Initializing Program \n");
 	if (argc < 3)
 	{
 		printf("Usage: %s [N_PASSES] [N_THREADS]\n", argv[0]);
@@ -39,8 +43,10 @@ int main(int argc, char *argv[])
 	cur_turn = 0;
 	cur_pass = 0;
 	lock_init(&lock);
+	// printf("Successfuly acquired initial lock\n");
 	for (int i = 0; i < n_threads; i++)
 	{
+		printf("Creating thread %d\n", i);
 		thread_create(thread_fn, (void *)(uint64)i);
 	}
 	for (int i = 0; i < n_threads; i++)
