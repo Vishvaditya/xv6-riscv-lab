@@ -222,8 +222,13 @@ found:
     release(&t->lock);
     return 0;
   }
-
-
+  for (uint64 va = TRAMPOLINE - PGSIZE; va >= 0; va -= PGSIZE) {
+    if (walkaddr_updt(parent->pagetable, va) == 0) { // Check if the page is unused (using modified walkaddr)
+      t->thread_va = va;
+      mappages(parent->pagetable, t->thread_va, PGSIZE, (uint64)t->trapframe, PTE_R | PTE_W);
+      break;
+    }
+  }
   memset(&t->context, 0, sizeof(t->context));
  
   t->context.sp = t->kstack + PGSIZE;  // Setting up the context stack pointer for context switching
@@ -489,13 +494,6 @@ clone(void *stack)
   if ((t = allocthread(p)) == 0) {
     return -1; // No available slots for new thread
   }
-
-  if(mappages(t->pagetable, TRAPFRAME - (PGSIZE * t->thread_id), PGSIZE,(uint64)(t->trapframe), PTE_R | PTE_W) < 0){
-    // unmap trampoline and free page table
-    uvmunmap(t->pagetable, TRAMPOLINE, 1, 0);uvmfree(t->pagetable,0);
-    return 0; 
-  }
-
 
   *(t->trapframe) = *(p->trapframe); // Copy parent's trapframe
   t->trapframe->sp = (uint64)stack + PGSIZE; // Adjust stack pointer for the new thread

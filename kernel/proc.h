@@ -95,6 +95,7 @@ struct proc {
   int thread_id;               // Thread ID if it's a thread
 
   int is_thread;               // Variable to check if a process is thread or not
+  uint64 thread_va;               // Variable to store the virtual address header of the thread
 
   // wait_lock must be held when using this:
   struct proc *parent;         // Parent process
