@@ -104,6 +104,7 @@ allocpid()
   return pid;
 }
 
+// Function to initialize thread id
 int
 alloctid()
 {
@@ -194,11 +195,13 @@ allocthread(struct proc *parent)
     if(t->state == UNUSED) {
       goto found;
     }
+    else{
     release(&t->lock);
+    }
   }
   return 0;
 
-  found:
+found:
     // acuire lock here
     acquire(&wait_lock);
     t->parent = parent;
@@ -216,7 +219,6 @@ allocthread(struct proc *parent)
     t->thread_va = 0;
 
     for (uint64 va = TRAMPOLINE - PGSIZE; va >= 0; va -= PGSIZE) {
-      // printf("%ld\n", walkaddr_updt(parent->pagetable, va));
       if (walkaddr_updt(parent->pagetable, va) == 0) { // Check if the page is unused (using modified walkaddr)
         t->thread_va = va;
         mappages(parent->pagetable, t->thread_va, PGSIZE, (uint64)t->trapframe, PTE_R | PTE_W);
@@ -230,8 +232,6 @@ allocthread(struct proc *parent)
     t->context.sp = t->kstack + PGSIZE;
     t->context.ra = (uint64)forkret;
     
-    // traverse the page table and find free page to allocate kstack (see vm.c/walkaddr) (procpagetable/mappages)
-
     return t;
 }
 
@@ -249,14 +249,26 @@ static void
 freeproc(struct proc *t)
 {
   if(t->thread_id>0){
-    if(t->trapframe)
+    if(t->trapframe){
       kfree((void*)t->trapframe);
-    t->trapframe = 0;
-    if(t->pagetable)
+      t->trapframe = 0;
+    }
+    if(t->pagetable){
       thread_freepagetable(t->pagetable, t->thread_id, t->kstack);
-    t->pagetable = 0;
+      t->pagetable = 0;
+    }
+    uvmunmap(t->parent->pagetable, t->thread_va, 1, 0);
+
+    if(t->kstack) {
+        kfree((void *)t->kstack); // Free the kernel stack
+        t->kstack = 0;
+    }
+    
+    t->sz = 0;
+    t->thread_id = 0;
+    t->parent = 0;
+    t->thread_va = 0;  
     t->state = UNUSED;
-    uvmunmap(t->pagetable, t->thread_va, 1, 0);
   }
 
   else{
@@ -274,8 +286,7 @@ freeproc(struct proc *t)
   t->killed = 0;
   t->xstate = 0;
   t->state = UNUSED;
-}
-
+  } 
 }
 
 // Create a user page table for a given process, with no user memory,
@@ -553,7 +564,9 @@ exit(int status)
   if(p == initproc)
     panic("init exiting");
 
-  // if(p->thread_id > 0){
+  
+  // // acquire(&p->parent->lock);
+  // if(--p->parent->thread_count != 0){
   //   // Atomic decrement
   //   __sync_fetch_and_sub(&p->parent->thread_count, 1);
     
@@ -569,6 +582,7 @@ exit(int status)
   //   }
   // }
 
+  else{
   // Close all open files.
   for(int fd = 0; fd < NOFILE; fd++){
     if(p->ofile[fd]){
@@ -601,6 +615,7 @@ exit(int status)
   // Jump into the scheduler, never to return.
   sched();
   panic("zombie exit");
+  }
 }
 
 // Wait for a child process to exit and return its pid.
