@@ -331,6 +331,18 @@ proc_freepagetable(pagetable_t pagetable, uint64 sz)
 void
 thread_freepagetable(pagetable_t pagetable, int thread_id, uint64 kstack)
 {
+  if (thread_id <= 0) {
+    printf("Error: Invalid thread ID %d\n", thread_id);
+    return;
+  }
+
+  // Remove the trapframe mapping for this specific thread
+  uvmunmap(pagetable, TRAPFRAME - (PGSIZE*thread_id), 1, 0);
+
+  // Free the kernel stack
+  if (kstack) {
+    kfree((void*)kstack);
+  }
   
 }
 
