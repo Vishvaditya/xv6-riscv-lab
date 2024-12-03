@@ -15,6 +15,10 @@ struct proc *initproc;
 int nextpid = 1;
 struct spinlock pid_lock;
 
+// Initializing variable and lock to keep track of thread id
+int nexttid = 1;
+struct spinlock tid_lock;
+
 extern void forkret(void);
 static void freeproc(struct proc *p);
 
@@ -102,6 +106,21 @@ allocpid()
   return pid;
 }
 
+// Creating a separate function to allocate thread ID
+// This has the same implementation as allocpid function
+int
+alloctid()
+{
+  int tid;
+  
+  acquire(&tid_lock);
+  tid = nexttid;
+  nexttid = nexttid + 1;
+  release(&tid_lock);
+
+  return tid;
+}
+
 // Look in the process table for an UNUSED proc.
 // If found, initialize state required to run in the kernel,
 // and return with p->lock held.
@@ -172,6 +191,42 @@ found:
 static struct proc*
 allocthread(struct proc *parent)
 {
+  struct proc *t;
+
+  for(t = proc; t < &proc[NPROC]; t++) {
+    acquire(&t->lock);
+    if(t->state == UNUSED) {
+      goto found;
+    } else {
+      release(&t->lock);
+    }
+  }
+  return 0;
+
+found:
+  acquire(&wait_lock);
+  // t->pid = allocpid();
+  t->parent = parent; // Setting up the parent of the thread
+  parent->thread_count++; // Incrementing the thread count of the parent
+  t->pagetable = parent->pagetable; // Using the same page table as the parent
+  t->thread_id = alloctid();
+  t->state = USED;
+  release(&wait_lock);
+  
+
+  // Allocating trapframe memory
+  if((t->trapframe = (struct trapframe *)kalloc()) == 0){
+    freeproc(t);
+    release(&t->lock);
+    return 0;
+  }
+
+
+  memset(&t->context, 0, sizeof(t->context));
+ 
+  t->context.sp = t->kstack + PGSIZE;  // Setting up the context stack pointer for context switching
+
+  return t;
 
 }
 
