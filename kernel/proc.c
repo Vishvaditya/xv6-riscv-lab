@@ -482,7 +482,41 @@ fork(void)
 int
 clone(void *stack) 
 {
+  struct proc *p = myproc(); // Get the current process (parent thread)
+  struct proc *t;
+  
+  // Allocate a new thread (similar to fork)
+  if ((t = allocthread(p)) == 0) {
+    return -1; // No available slots for new thread
+  }
 
+  if(mappages(t->pagetable, TRAPFRAME - (PGSIZE * t->thread_id), PGSIZE,(uint64)(t->trapframe), PTE_R | PTE_W) < 0){
+    // unmap trampoline and free page table
+    uvmunmap(t->pagetable, TRAMPOLINE, 1, 0);uvmfree(t->pagetable,0);
+    return 0; 
+  }
+
+
+  *(t->trapframe) = *(p->trapframe); // Copy parent's trapframe
+  t->trapframe->sp = (uint64)stack + PGSIZE; // Adjust stack pointer for the new thread
+  t->trapframe->sp -= t->trapframe->sp%16;
+  t->trapframe->a0 = 0; // Return 0 in the child thread
+
+
+  // Share the same address space and file descriptors
+  for (int i = 0; i < NOFILE; i++){
+    t->ofile[i] = filedup(p->ofile[i]); // Copy each file descriptor
+  }
+  
+  t->cwd = p->cwd;             // Share current working directory
+  t->parent = p;               // Set the parent process
+
+  // Add to the scheduler
+  t->state = RUNNABLE;
+  int curr_tid;
+  curr_tid = t->thread_id;
+  release(&t->lock);
+  return curr_tid; // Return the new thread ID
 }
 
 // Pass p's abandoned children to init.
