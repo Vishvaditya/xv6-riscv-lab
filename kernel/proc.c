@@ -198,9 +198,8 @@ allocthread(struct proc *parent)
     acquire(&t->lock);
     if(t->state == UNUSED) {
       goto found;
-    } else {
-      release(&t->lock);
     }
+    release(&t->lock);
   }
   return 0;
 
@@ -215,13 +214,6 @@ found:
   t->state = USED;
   release(&wait_lock);
   
-
-  // Allocating trapframe memory
-  if((t->trapframe = (struct trapframe *)kalloc()) == 0){
-    freeproc(t);
-    release(&t->lock);
-    return 0;
-  }
   for (uint64 va = TRAMPOLINE - PGSIZE; va >= 0; va -= PGSIZE) {
     if (walkaddr_updt(parent->pagetable, va) == 0) { // Check if the page is unused (using modified walkaddr)
       t->thread_va = va;
@@ -229,9 +221,12 @@ found:
       break;
     }
   }
+
+  t->kstack = (uint64)kalloc();
   memset(&t->context, 0, sizeof(t->context));
  
   t->context.sp = t->kstack + PGSIZE;  // Setting up the context stack pointer for context switching
+  t->context.ra = (uint64)forkret;
 
   return t;
 
@@ -250,10 +245,7 @@ found:
 static void
 freeproc(struct proc *p)
 {
-  if(p->is_thread && p->pagetable){
-      thread_freepagetable(p->pagetable, p->thread_id, p->kstack);
-  }
-  else if(p->pagetable){
+  if(p->pagetable){
     proc_freepagetable(p->pagetable, p->sz);
   }
 
@@ -293,7 +285,6 @@ freeproc(struct proc *p)
 pagetable_t
 proc_pagetable(struct proc *p)
 {
-  if(p->is_thread==0){
   pagetable_t pagetable;
 
   // An empty page table.
@@ -321,10 +312,6 @@ proc_pagetable(struct proc *p)
   }
 
   return pagetable;
-  }
-  else{
-    return p->parent->pagetable;
-  }
 }
 
 // Free a process's page table, and free the
