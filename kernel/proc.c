@@ -281,6 +281,7 @@ freeproc(struct proc *p)
 pagetable_t
 proc_pagetable(struct proc *p)
 {
+  if(p->is_thread==0){
   pagetable_t pagetable;
 
   // An empty page table.
@@ -308,6 +309,10 @@ proc_pagetable(struct proc *p)
   }
 
   return pagetable;
+  }
+  else{
+    return p->parent->pagetable;
+  }
 }
 
 // Free a process's page table, and free the
