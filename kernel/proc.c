@@ -142,6 +142,7 @@ allocproc(void)
 
 found:
   p->pid = allocpid();
+  p->is_thread = 0;
   p->state = USED;
 
   // Allocate a trapframe page.
@@ -210,6 +211,7 @@ found:
   parent->thread_count++; // Incrementing the thread count of the parent
   t->pagetable = parent->pagetable; // Using the same page table as the parent
   t->thread_id = alloctid();
+  t->is_thread = 1;
   t->state = USED;
   release(&wait_lock);
   
