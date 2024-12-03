@@ -93,7 +93,7 @@ struct proc {
   int pid;                     // Process ID
   int thread_count;            // Number of threads in the process
   int thread_id;               // Thread ID if it's a thread
-  uint64 thread_va;                
+  uint64 thread_va;            // Variable to hold the virtual address of the thread
 
   // wait_lock must be held when using this:
   struct proc *parent;         // Parent process

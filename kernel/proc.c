@@ -473,7 +473,6 @@ fork(void)
 int
 clone(void *stack) 
 {
-  // printf("INIT CLONE FN\n");
   struct proc *p = myproc(); // Get the current process (parent thread)
   struct proc *t;
 

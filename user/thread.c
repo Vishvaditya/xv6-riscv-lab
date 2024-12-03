@@ -17,14 +17,10 @@
  * 
  */
 int thread_create(void *(*start_routine)(void*), void *arg) {
-    void *stack = malloc(2*PGSIZE);
-    // printf("Initialized Stack\n");
-    
+    void *stack = malloc(2*PGSIZE);    
     int thread_id;
 
-    // printf("Calling Clone Function \n");
     thread_id = clone((void *)stack);
-    // printf("THREAD ID: %d", thread_id);
     if(thread_id != 0) {
         return 0;
     }
