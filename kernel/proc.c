@@ -502,13 +502,6 @@ clone(void *stack)
   struct proc *p = myproc(); // Get the current process (parent thread)
   struct proc *t;
 
-    // Set up the new thread's user stack
-
-  // if ((uint64)stack % PGSIZE != 0) {
-  //   // Stack pointer must be page-aligned
-  //   return -1;
-  // }
-  
   // Allocate a new thread (similar to fork)
   if ((t = allocthread(p)) == 0) {
     return -1; // No available slots for new thread
@@ -517,16 +510,15 @@ clone(void *stack)
   // Copy trapframe to the new thread
   *(t->trapframe) = *(p->trapframe); // Copy parent's trapframe
   t->trapframe->sp = (uint64)stack + PGSIZE; // Adjust stack pointer for the new thread
-  t->trapframe->sp -= t->trapframe->sp%16;
+  // t->trapframe->sp -= t->trapframe->sp%16;
   t->trapframe->a0 = 0; // Return 0 in the child thread
-  // p->trapframe->a0 = t->thread_id;
 
   // Share the same address space and file descriptors
   for (int i = 0; i < NOFILE; i++){
-    t->ofile[i] = p->ofile[i]; // Copy each file descriptor
+    t->ofile[i] = filedup(p->ofile[i]); // Copy each file descriptor
   }
   
-  t->cwd = p->cwd;             // Share current working directory
+  t->cwd = idup(p->cwd);             // Share current working directory
   t->parent = p;               // Set the parent process
 
   // Add to the scheduler
@@ -563,24 +555,6 @@ exit(int status)
 
   if(p == initproc)
     panic("init exiting");
-
-  
-  // // acquire(&p->parent->lock);
-  // if(--p->parent->thread_count != 0){
-  //   // Atomic decrement
-  //   __sync_fetch_and_sub(&p->parent->thread_count, 1);
-    
-  //   // Safer resource freeing
-  //   if(p->kstack) {
-  //     kfree((void *)p->kstack);
-  //     p->kstack = 0;
-  //   }
-    
-  //   if(p->trapframe) {
-  //     kfree((void*)p->trapframe);
-  //     p->trapframe = 0;
-  //   }
-  // }
 
   else{
   // Close all open files.
