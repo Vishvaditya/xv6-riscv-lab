@@ -175,6 +175,7 @@ uint64          walkaddr(pagetable_t, uint64);
 int             copyout(pagetable_t, uint64, char *, uint64);
 int             copyin(pagetable_t, char *, uint64, uint64);
 int             copyinstr(pagetable_t, char *, uint64, uint64);
+uint64             walkaddr_updt(pagetable_t, uint64);     // Header declaration for updated walkaddr function
 
 // plic.c
 void            plicinit(void);
