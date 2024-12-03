@@ -248,35 +248,14 @@ found:
 static void
 freeproc(struct proc *t)
 {
-  if(t->thread_id>0){
-    if(t->trapframe){
-      kfree((void*)t->trapframe);
-      t->trapframe = 0;
-    }
-    if(t->pagetable){
-      thread_freepagetable(t->pagetable, t->thread_id, t->kstack);
-      t->pagetable = 0;
-    }
-    uvmunmap(t->parent->pagetable, t->thread_va, 1, 0);
-
-    if(t->kstack) {
-        kfree((void *)t->kstack); // Free the kernel stack
-        t->kstack = 0;
-    }
-    
-    t->sz = 0;
-    t->thread_id = 0;
-    t->parent = 0;
-    t->thread_va = 0;  
-    t->state = UNUSED;
-  }
-
-  else{
   if(t->trapframe)
     kfree((void*)t->trapframe);
   t->trapframe = 0;
-  if(t->pagetable)
-    proc_freepagetable(t->pagetable, t->sz);
+  if(t->thread_id !=0 && t->pagetable !=0){
+    thread_freepagetable(t->pagetable , t->thread_id, t->kstack);
+  }else if(t->pagetable != 0){
+     proc_freepagetable(t->pagetable , t->sz );
+  }
   t->pagetable = 0;
   t->sz = 0;
   t->pid = 0;
@@ -286,7 +265,8 @@ freeproc(struct proc *t)
   t->killed = 0;
   t->xstate = 0;
   t->state = UNUSED;
-  } 
+  // make process threadid to 0
+  t->thread_id=0;
 }
 
 // Create a user page table for a given process, with no user memory,
@@ -336,6 +316,7 @@ proc_pagetable(struct proc *p)
   }
 
   return pagetable;
+
 }
 
 // Free a process's page table, and free the
@@ -361,14 +342,8 @@ proc_freepagetable(pagetable_t pagetable, uint64 sz)
 void
 thread_freepagetable(pagetable_t pagetable, int thread_id, uint64 kstack)
 {
-  if (thread_id <= 0) {
-    // Log error or handle invalid thread ID
-    printf("Error: Invalid thread ID %d\n", thread_id);
-    return;
-  }
-
   // Remove the trapframe mapping for this specific thread
-  uvmunmap(pagetable, TRAPFRAME, 1, 1);
+  uvmunmap(pagetable, TRAPFRAME-(PGSIZE*thread_id), 1, 0);
 
   // Free the kernel stack
   if (kstack) {
@@ -510,7 +485,7 @@ clone(void *stack)
   // Copy trapframe to the new thread
   *(t->trapframe) = *(p->trapframe); // Copy parent's trapframe
   t->trapframe->sp = (uint64)stack + PGSIZE; // Adjust stack pointer for the new thread
-  // t->trapframe->sp -= t->trapframe->sp%16;
+  t->trapframe->sp -= t->trapframe->sp%16;
   t->trapframe->a0 = 0; // Return 0 in the child thread
 
   // Share the same address space and file descriptors
@@ -518,14 +493,16 @@ clone(void *stack)
     t->ofile[i] = (p->ofile[i]); // Copy each file descriptor
   }
   
+  t->sz = p->sz;
   t->cwd = idup(p->cwd);             // Share current working directory
+
+  // acquire(&wait_lock);
   t->parent = p;               // Set the parent process
 
   // Add to the scheduler
   t->state = RUNNABLE;
   int curr_tid;
   curr_tid = t->thread_id;
-  // printf("Thread created with id : %d", curr_tid);
   release(&t->lock);
   return curr_tid; // Return the new thread ID
 }
@@ -558,11 +535,13 @@ exit(int status)
 
   else{
   // Close all open files.
-  for(int fd = 0; fd < NOFILE; fd++){
-    if(p->ofile[fd]){
-      struct file *f = p->ofile[fd];
-      fileclose(f);
-      p->ofile[fd] = 0;
+  if(p->thread_id == 0){
+    for(int fd = 0; fd < NOFILE; fd++){
+      if(p->ofile[fd]){
+        struct file *f = p->ofile[fd];
+        fileclose(f);
+        p->ofile[fd] = 0;
+      }
     }
   }
 
