@@ -515,7 +515,7 @@ clone(void *stack)
 
   // Share the same address space and file descriptors
   for (int i = 0; i < NOFILE; i++){
-    t->ofile[i] = filedup(p->ofile[i]); // Copy each file descriptor
+    t->ofile[i] = (p->ofile[i]); // Copy each file descriptor
   }
   
   t->cwd = idup(p->cwd);             // Share current working directory
