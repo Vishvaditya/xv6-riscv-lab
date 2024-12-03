@@ -246,44 +246,36 @@ allocthread(struct proc *parent)
  * @param t the thread to be freed
  */
 static void
-freeproc(struct proc *p)
+freeproc(struct proc *t)
 {
-  if(p->trapframe)
-    kfree((void *)p->trapframe);
-  p->trapframe = 0;
-
-  if(p->thread_count>0){
-    if(p->parent)
-      p->parent->thread_count--;
+  if(t->thread_id>0){
+    if(t->trapframe)
+      kfree((void*)t->trapframe);
+    t->trapframe = 0;
+    if(t->pagetable)
+      thread_freepagetable(t->pagetable, t->thread_id, t->kstack);
+    t->pagetable = 0;
+    t->state = UNUSED;
+    uvmunmap(t->pagetable, t->thread_va, 1, 0);
   }
 
-  if(p->kstack)
-    kfree((void *)p->kstack);
-
-  if(p->thread_id>0){
-    p->pagetable=0;
-  }
   else{
-    if(p->pagetable)
-    proc_freepagetable(p->pagetable, p->sz);
-  }
+  if(t->trapframe)
+    kfree((void*)t->trapframe);
+  t->trapframe = 0;
+  if(t->pagetable)
+    proc_freepagetable(t->pagetable, t->sz);
+  t->pagetable = 0;
+  t->sz = 0;
+  t->pid = 0;
+  t->parent = 0;
+  t->name[0] = 0;
+  t->chan = 0;
+  t->killed = 0;
+  t->xstate = 0;
+  t->state = UNUSED;
+}
 
-  // p->pagetable = 0;
-  // p->sz = 0;
-  // p->pid = 0;
-  // p->parent = 0;
-  p->name[0] = 0;
-  p->chan = 0;
-  p->killed = 0;
-  p->xstate = 0;
-  // p->state = UNUSED;
-
-  p->trapframe = 0;
-  p->kstack = 0;
-  p->pagetable = 0;
-  p->parent = 0;
-  p->thread_id = 0;
-  p->state = UNUSED;
 }
 
 // Create a user page table for a given process, with no user memory,
